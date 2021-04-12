@@ -308,12 +308,18 @@ delete edge follow "team1" -> "team2";
 ``` 
 CREATE {TAG | EDGE} INDEX [IF NOT EXISTS] <index_name>
 ON {<tag_name> | <edge_name>} (prop_name_list);
+
+CREATE TAG INDEX player_index_0 on player(name(20));
 ```
 
 - 重建索引
 
 ``` 
 REBUILD {TAG | EDGE} INDEX <index_name>;
+
+REBUILD TAG INDEX player_index_0;
 ```
 
+> 说明：为没有指定长度的变量属性创建索引时，需要指定索引长度。在utf-8编码中，一个中文字符占3字节，请根据变量属性长度设置合适的索引长度。例如10个中文字符，索引长度需要为30。详情请参见创建索引。
 
+#### 基于索引的LOOKUP和MATCH示例
