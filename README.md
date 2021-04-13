@@ -300,7 +300,7 @@ delete edge follow "team1" -> "team2";
 
 可以通过`CREATE INDEX`语句为标签（`tag`）和边类型（`edge type`）增加索引。
 
-- `MATCH`和`LOOKUP`语句的执行都依赖索引，但是索引会导致写性能大幅降低（降低90%甚至更多）。请不要随意在生产环境中使用索引，除非您很清楚使用索引对业务的影响。
+- `MATCH`和`LOOKUP`语句的执行都依赖索引，但是索引会导致写性能大幅降低（`降低90%甚至更多`）。请不要随意在生产环境中使用索引，除非您很清楚使用索引对业务的影响。
 - 您必须为已存在的数据重建索引，否则不能索引已存在的数据，导致无法在MATCH和LOOKUP语句中返回这些数据。更多信息，请参见重建索引。
 
 - 创建索引
@@ -322,4 +322,133 @@ REBUILD TAG INDEX player_index_0;
 
 > 说明：为没有指定长度的变量属性创建索引时，需要指定索引长度。在utf-8编码中，一个中文字符占3字节，请根据变量属性长度设置合适的索引长度。例如10个中文字符，索引长度需要为30。详情请参见创建索引。
 
-#### 基于索引的LOOKUP和MATCH示例
+#### LOOKUP
+- 更具索引遍历数据
+- 通过标签列出点: 检索指定标签的所有点ID。
+- 通过边类型列出边：检索指定边类型的所有边的起始点、目的点和rank。
+- 计数指定标签的点或指定边类型的边。
+
+``` 
+LOOKUP ON {<vertex_tag> | <edge_type>} [WHERE <expression> [AND <expression> ...]] [YIELD <return_list>];
+
+<return_list>
+    <prop_name> [AS <col_alias>] [, <prop_name> [AS <prop_alias>] ...];
+```
+
+``` 
+CREATE TAG INDEX player_name_0 on player(name(10));
+
+REBUILD TAG INDEX player_name_0
+
+LOOKUP ON player WHERE player.name == "Tony Parker" \
+YIELD player.name, player.age;
+
+MATCH (v:player{name:"Tony Parker"}) RETURN v;
+```
+
+#### Match
+- 基于模式（pattern）匹配的搜索功能
+- 一个MATCH语句定义了一个搜索模式，用该模式匹配存储在Nebula Graph中的数据，然后用RETURN子句检索数据。
+
+``` 
+MATCH <pattern> [<WHERE clause>] RETURN <output>
+```
+
+- 匹配所有 tag为player 的点
+
+``` 
+// 匹配所有 tag为player 的点
+MATCH (v:player) RETURN v;
+
+```
+
+- 条件匹配
+
+```
+// select * from player where name = "Tim Duncan"
+MATCH(v: player) where v.name == "Tim Duncan" RETURN v;
+MATCH(v: player{name: "Tim Duncan"}) RETURN v;
+
+```
+
+- 匹配点
+ 
+```
+// 匹配点
+MATCH(v) WHERE id(v) == 'player101' RETURN v;
+
+``` 
+
+- 匹配多个点 
+
+```
+// 匹配多个点  select * from player where name = 'Dwight Howard' and id in ['player111']
+MATCH (v:player { name: 'Dwight Howard' })
+WHERE id(v) in ["player111"]
+RETURN v;
+
+``` 
+
+- 匹配链接的点
+
+``` 
+// 匹配链接的点  `--符号表示两个方向的边，并匹配这些边连接的点。`
+MATCH (v:player{name:"Tim Duncan"})--(v2) 
+        RETURN v2.name AS Name;
+
+// 匹配链接的点 加上指向
+MATCH (v:player{name:"Tim Duncan"})-->(v2)<--(v3) \
+        RETURN v3.name AS Name;
+
+```
+
+-  匹配路径
+
+``` 
+// 匹配路径
+MATCH p=(v:player{name: 'TimX'})-->(v2) 
+        RETURN v2 AS Name, p;
+
+resp:
+name, p
+("team200" :team{name: "Warriors"})	<("player100" :player{age: 42, name: "TimX"})-[:serve@0 {end_year: 2016, start_year: 1997}]->("team200" :team{name: "Warriors"})>
+("player102" :player{age: 33, name: "LaMarcus Aldridge"})	<("player100" :player{age: 42, name: "TimX"})-[:follow@0 {degree: 90}]->("player102" :player{age: 33, name: "LaMarcus Aldridge"})>
+("player101" :player{age: 36, name: "Tony Parker"})	<("player100" :player{age: 42, name: "TimX"})-[:follow@0 {degree: 96}]->("player101" :player{age: 36, name: "Tony Parker"})>
+
+
+``` 
+
+- 匹配边
+
+``` 
+// 匹配边 `除了用--、-->、<--表示未命名的边之外，您还可以在方括号中使用自定义变量命名边。例如-[e]-。`
+MATCH (v:player{name: 'TimX'})-[e]->(v2) 
+        RETURN e;
+
+// 匹配边类型和属性
+MATCH (v:player{name:"Tim Duncan"})-[e:serve]-(v2) 
+        RETURN e;
+
+// 匹配多个边类型
+MATCH (v:player{name:"Tim Duncan"})-[e:follow|:serve]->(v2) \
+        RETURN e;
+
+``` 
+
+- 匹配多条边
+
+``` 
+// 匹配多条边
+MATCH (v:player{name:"Tim Duncan"})-[]->(v2)<-[e:serve]-(v3) 
+        RETURN v2, v3;
+```
+
+- 匹配定长路径
+在模式中使用`:<edge_type>*<hop>`匹配定长路径。`hop`必须是一个非负整数
+
+``` 
+MATCH p=(v:player{name:"Tim Duncan"})-[e:follow*2]->(v2) 
+        RETURN DISTINCT v2 AS Friends;
+```
+
+### GO
