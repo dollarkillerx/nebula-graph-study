@@ -451,4 +451,8 @@ MATCH p=(v:player{name:"Tim Duncan"})-[e:follow*2]->(v2)
         RETURN DISTINCT v2 AS Friends;
 ```
 
-### GO
+- 匹配1～3长度 所有节点
+``` 
+MATCH (v:saic)-[e:saic_to_investment*1..3]->(v2) where id(v) == "1025417406" 
+         RETURN v.name as src_name, v2.name as dst_name, id(v) as src, id(v2) as dst,e.share as share;
+```
